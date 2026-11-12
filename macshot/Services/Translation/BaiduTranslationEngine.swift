@@ -15,14 +15,14 @@ struct BaiduTranslationEngine: TranslationEngine {
     /// of access logs and proxies' URL limits.
     static let endpoint = URL(string: "https://fanyi-api.baidu.com/api/trans/vip/translate")!
 
-    /// Baidu's documented limit is 6000 bytes of query. Percent-encoding can
-    /// triple the size of CJK text, so the budget stays well under it.
-    static let maximumBytesPerRequest = 1000
-    static let maximumLinesPerRequest = 20
-
     let provider = TranslationProvider.baidu
     let displayName = "Baidu Translate"
+    /// Baidu's free tier allows about one request per second.
     let minimumRequestInterval: TimeInterval = 1.05
+    /// Baidu documents a 6000-byte query limit. Percent-encoding can triple the
+    /// size of CJK text, so the budget stays well under it.
+    let maximumBytesPerRequest = 1000
+    let maximumLinesPerRequest = 20
 
     let credentials: [TranslationCredential] = [
         TranslationCredential(
@@ -92,8 +92,8 @@ struct BaiduTranslationEngine: TranslationEngine {
 
         let groups = TranslationBatchPlanner.groups(
             for: texts,
-            maximumBytes: Self.maximumBytesPerRequest,
-            maximumLines: Self.maximumLinesPerRequest)
+            maximumBytes: maximumBytesPerRequest,
+            maximumLines: maximumLinesPerRequest)
 
         TranslationBatchSender.send(
             lines: texts,

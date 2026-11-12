@@ -13,14 +13,15 @@ struct YoudaoTranslationEngine: TranslationEngine {
 
     static let endpoint = URL(string: "https://openapi.youdao.com/api")!
 
-    /// Youdao rejects queries above 5000 characters; the byte budget keeps
-    /// multi-line batches far below that even with percent-encoded CJK text.
-    static let maximumBytesPerRequest = 1000
-    static let maximumLinesPerRequest = 20
-
     let provider = TranslationProvider.youdao
     let displayName = "Youdao Translate"
+    /// Youdao's free tier is per-minute rather than per-second limited, so
+    /// requests only need light spacing.
     let minimumRequestInterval: TimeInterval = 0.1
+    /// Youdao rejects queries above 5000 characters; the byte budget keeps
+    /// multi-line batches far below that even with percent-encoded CJK text.
+    let maximumBytesPerRequest = 1000
+    let maximumLinesPerRequest = 20
 
     let credentials: [TranslationCredential] = [
         TranslationCredential(
@@ -96,8 +97,8 @@ struct YoudaoTranslationEngine: TranslationEngine {
 
         let groups = TranslationBatchPlanner.groups(
             for: texts,
-            maximumBytes: Self.maximumBytesPerRequest,
-            maximumLines: Self.maximumLinesPerRequest)
+            maximumBytes: maximumBytesPerRequest,
+            maximumLines: maximumLinesPerRequest)
 
         TranslationBatchSender.send(
             lines: texts,
