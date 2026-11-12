@@ -8,7 +8,11 @@ name: Build Unsigned DMG
 # DMG, drag the app out, and approve it once in System Settings > Privacy & Security.
 #
 # Nothing here publishes anything: no release, no appcast, no tags.
+#
+# GitHub only offers workflow_dispatch once the file exists on the default
+# branch, so a PR run is the way to get a package out of a feature branch.
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       variant:
@@ -30,7 +34,7 @@ jobs:
     timeout-minutes: 60
 
     env:
-      VARIANT: ${{ inputs.variant }}
+      VARIANT: ${{ inputs.variant || 'both' }}
       VERSION: 0.0.${{ github.run_number }}   # Sparkle needs a numeric version
       BUILD_NUMBER: ${{ github.run_number }}
 
