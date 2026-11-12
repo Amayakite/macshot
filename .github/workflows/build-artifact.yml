@@ -1,0 +1,194 @@
+name: Build Unsigned DMG
+
+# Produces installable-but-unsigned DMGs as workflow artifacts.
+#
+# The real release workflow (build-release.yml) needs a Developer ID certificate,
+# notarization credentials and a Homebrew tap token. This one needs no secrets at
+# all, so a fork or a feature branch can still produce a package to test: mount the
+# DMG, drag the app out, and approve it once in System Settings > Privacy & Security.
+#
+# Nothing here publishes anything: no release, no appcast, no tags.
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: 'Which app to package'
+        type: choice
+        options: [both, normal, offline]
+        default: both
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-artifact-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: macos-26        # same SDK the release build uses
+    timeout-minutes: 60
+
+    env:
+      VARIANT: ${{ inputs.variant }}
+      VERSION: 0.0.${{ github.run_number }}   # Sparkle needs a numeric version
+      BUILD_NUMBER: ${{ github.run_number }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Select Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XC" ]; then XC=$(ls -d /Applications/Xcode*.app | sort -V | tail -1); fi
+          echo "Using $XC"
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+
+      - name: Cache SwiftPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('macshot.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: ${{ runner.os }}-spm-
+
+      # ── Build ──────────────────────────────────────────────────────────────
+      - name: Build normal variant
+        if: ${{ inputs.variant != 'offline' }}
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project macshot.xcodeproj \
+            -scheme macshot \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            | { grep -E "error:|\*\* BUILD" || true; }
+          exit ${PIPESTATUS[0]}
+
+      - name: Build offline variant
+        if: ${{ inputs.variant != 'normal' }}
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project macshot.xcodeproj \
+            -scheme macshot \
+            -configuration Release \
+            -derivedDataPath build-offline \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS="OFFLINE" \
+            PRODUCT_BUNDLE_IDENTIFIER="com.sw33tlie.macshot.offline" \
+            PRODUCT_NAME="macshot Offline" \
+            INFOPLIST_KEY_CFBundleDisplayName="macshot Offline" \
+            INFOPLIST_KEY_CFBundleName="macshot Offline" \
+            INFOPLIST_KEY_SUFeedURL="https://raw.githubusercontent.com/sw33tLie/macshot/main/appcast-offline.xml" \
+            | { grep -E "error:|\*\* BUILD" || true; }
+          exit ${PIPESTATUS[0]}
+
+      # Mirrors the release workflow's offline checks: the packaged app must carry
+      # the offline feed and must not advertise the Google OAuth URL scheme.
+      - name: Verify offline bundle
+        if: ${{ inputs.variant != 'normal' }}
+        run: |
+          python3 << 'PYEOF'
+          import plistlib
+          from pathlib import Path
+
+          plist_path = Path("build-offline/Build/Products/Release/macshot Offline.app/Contents/Info.plist")
+          if not plist_path.exists():
+              raise SystemExit(f"missing app bundle at {plist_path}")
+          plist = plistlib.loads(plist_path.read_bytes())
+          expected_bundle_id = "com.sw33tlie.macshot.offline"
+          expected_feed_url = "https://raw.githubusercontent.com/sw33tLie/macshot/main/appcast-offline.xml"
+          if plist.get("CFBundleIdentifier") != expected_bundle_id:
+              raise SystemExit(f"Offline bundle id mismatch: {plist.get('CFBundleIdentifier')}")
+          if plist.get("SUFeedURL") != expected_feed_url:
+              raise SystemExit(f"Offline Sparkle feed mismatch: {plist.get('SUFeedURL')}")
+          if any(item.get("CFBundleURLName") == "Google OAuth" for item in plist.get("CFBundleURLTypes", [])):
+              raise SystemExit("Offline build still contains the Google OAuth URL scheme")
+          print("offline bundle verified")
+          PYEOF
+
+      # ── Package ────────────────────────────────────────────────────────────
+      - name: Package DMGs
+        run: |
+          brew install create-dmg
+
+          package_dmg() {
+            local APP="$1"
+            local DMG="$2"
+            local VOLNAME="$3"
+            local STAGING="$4"
+            local APP_NAME
+            APP_NAME="$(basename "$APP")"
+
+            rm -rf "$STAGING"
+            mkdir -p "$STAGING"
+            cp -R "$APP" "$STAGING/"
+
+            # create-dmg exits 2 when it cannot set the volume icon, which is
+            # harmless: the Finder window still shows the app icon.
+            create-dmg \
+              --volname "$VOLNAME" \
+              --background "assets/dmg-background.png" \
+              --window-pos 200 120 \
+              --window-size 600 400 \
+              --icon-size 100 \
+              --icon "$APP_NAME" 150 185 \
+              --app-drop-link 450 185 \
+              --no-internet-enable \
+              --hide-extension "$APP_NAME" \
+              "$DMG" \
+              "$STAGING" \
+              || [ $? -eq 2 ]
+          }
+
+          if [ "$VARIANT" != "offline" ]; then
+            package_dmg "build/Build/Products/Release/macshot.app" \
+                        "MacShot-unsigned-$VERSION.dmg" \
+                        "macshot" "/tmp/dmg-staging-normal"
+          fi
+          if [ "$VARIANT" != "normal" ]; then
+            package_dmg "build-offline/Build/Products/Release/macshot Offline.app" \
+                        "MacShot-Offline-unsigned-$VERSION.dmg" \
+                        "macshot Offline" "/tmp/dmg-staging-offline"
+          fi
+
+          # Prove the disk images are readable before uploading them.
+          for dmg in MacShot-*-unsigned-*.dmg; do
+            hdiutil imageinfo "$dmg" > /dev/null
+            echo "$(shasum -a 256 "$dmg")"
+          done
+
+      - name: Summarize
+        run: |
+          {
+            echo "## Unsigned DMG build"
+            echo ""
+            echo "Version: \`$VERSION\` · build \`$BUILD_NUMBER\` · variant: \`$VARIANT\`"
+            echo ""
+            echo "| File | Size |"
+            echo "| --- | --- |"
+            for dmg in MacShot-*-unsigned-*.dmg; do
+              echo "| \`$dmg\` | $(du -h "$dmg" | cut -f1) |"
+            done
+            echo ""
+            echo "Unsigned: after mounting, drag the app to Applications and approve it once in System Settings > Privacy & Security."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload DMGs
+        uses: actions/upload-artifact@v4
+        with:
+          name: macshot-unsigned-dmg-${{ github.run_number }}
+          path: MacShot-*-unsigned-*.dmg
+          if-no-files-found: error
+          retention-days: 14
