@@ -104,9 +104,10 @@ final class TranslationEngineTests: XCTestCase {
         // first 10 + character count + last 10, as the v3 signature spec defines.
         let query = "1234567890MIDDLE0987654321TAIL"
         XCTAssertEqual(query.count, 30)
+        // Last ten characters of the query, which are "654321TAIL".
         XCTAssertEqual(
             TranslationSigner.youdaoQueryFingerprint(query),
-            "1234567890" + "30" + "87654321TAIL")
+            "1234567890" + "30" + "654321TAIL")
     }
 
     // MARK: - Vendor responses
