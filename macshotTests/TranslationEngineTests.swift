@@ -227,9 +227,9 @@ final class TranslationEngineTests: XCTestCase {
     // MARK: - Resolution + settings
 
     func testUnsupportedTargetFallsBackToTheEngineDefault() {
-        let codes = BaiduTranslationEngine().languages.map(\.code)
-        XCTAssertEqual(TranslationLanguageCatalog.resolvedCode("sk", in: codes), "en")
-        XCTAssertEqual(TranslationLanguageCatalog.resolvedCode("ja", in: codes), "ja")
+        let languages = BaiduTranslationEngine().languages
+        XCTAssertEqual(TranslationLanguageCatalog.resolvedCode("sk", in: languages), "en")
+        XCTAssertEqual(TranslationLanguageCatalog.resolvedCode("ja", in: languages), "ja")
     }
 
     func testStoredProviderForAnUnavailableEngineFallsBack() {

@@ -98,9 +98,10 @@ jobs:
             | { grep -E "error:|\*\* BUILD" || true; }
           exit ${PIPESTATUS[0]}
 
-      # Mirrors the release workflow's offline checks: the packaged app must carry
-      # the offline feed and must not advertise the Google OAuth URL scheme.
-      - name: Verify offline bundle
+      # Same offline packaging the release workflow does: an explicit SUFeedURL in
+      # Info.plist wins over INFOPLIST_KEY_SUFeedURL, so the feed and the Google
+      # OAuth URL scheme have to be patched into the built bundle, then verified.
+      - name: Patch and verify offline bundle
         if: ${{ inputs.variant != 'normal' }}
         run: |
           python3 << 'PYEOF'
@@ -110,16 +111,26 @@ jobs:
           plist_path = Path("build-offline/Build/Products/Release/macshot Offline.app/Contents/Info.plist")
           if not plist_path.exists():
               raise SystemExit(f"missing app bundle at {plist_path}")
-          plist = plistlib.loads(plist_path.read_bytes())
+
           expected_bundle_id = "com.sw33tlie.macshot.offline"
           expected_feed_url = "https://raw.githubusercontent.com/sw33tLie/macshot/main/appcast-offline.xml"
+
+          plist = plistlib.loads(plist_path.read_bytes())
+          plist["SUFeedURL"] = expected_feed_url
+          plist["CFBundleURLTypes"] = [
+              item for item in plist.get("CFBundleURLTypes", [])
+              if item.get("CFBundleURLName") != "Google OAuth"
+          ]
+          plist_path.write_bytes(plistlib.dumps(plist))
+
+          plist = plistlib.loads(plist_path.read_bytes())
           if plist.get("CFBundleIdentifier") != expected_bundle_id:
               raise SystemExit(f"Offline bundle id mismatch: {plist.get('CFBundleIdentifier')}")
           if plist.get("SUFeedURL") != expected_feed_url:
               raise SystemExit(f"Offline Sparkle feed mismatch: {plist.get('SUFeedURL')}")
           if any(item.get("CFBundleURLName") == "Google OAuth" for item in plist.get("CFBundleURLTypes", [])):
               raise SystemExit("Offline build still contains the Google OAuth URL scheme")
-          print("offline bundle verified")
+          print("offline bundle patched and verified")
           PYEOF
 
       # ── Package ────────────────────────────────────────────────────────────
