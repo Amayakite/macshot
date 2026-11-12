@@ -179,7 +179,8 @@ jobs:
           fi
 
           # Prove the disk images are readable before uploading them.
-          for dmg in MacShot-*-unsigned-*.dmg; do
+          # The glob must also match the normal variant (no "Offline" infix).
+          for dmg in MacShot-*unsigned-*.dmg; do
             hdiutil imageinfo "$dmg" > /dev/null
             echo "$(shasum -a 256 "$dmg")"
           done
@@ -193,7 +194,7 @@ jobs:
             echo ""
             echo "| File | Size |"
             echo "| --- | --- |"
-            for dmg in MacShot-*-unsigned-*.dmg; do
+            for dmg in MacShot-*unsigned-*.dmg; do
               echo "| \`$dmg\` | $(du -h "$dmg" | cut -f1) |"
             done
             echo ""
@@ -204,6 +205,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macshot-unsigned-dmg-${{ github.run_number }}
-          path: MacShot-*-unsigned-*.dmg
+          path: MacShot-*unsigned-*.dmg
           if-no-files-found: error
           retention-days: 14
