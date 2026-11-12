@@ -356,6 +356,7 @@
 "Region:" = "Region:";
 "Bucket:" = "Bucket:";
 "Access Key:" = "Přístupový klíč:";
+"App ID:" = "App ID:";
 "Secret Key:" = "Tajný klíč:";
 "Public URL:" = "Veřejná URL:";
 "Path Prefix:" = "Předpona cesty:";

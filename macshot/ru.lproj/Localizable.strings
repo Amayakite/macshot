@@ -356,6 +356,7 @@
 "Region:" = "Регион:";
 "Bucket:" = "Бакет:";
 "Access Key:" = "Ключ доступа:";
+"App ID:" = "App ID:";
 "Secret Key:" = "Секретный ключ:";
 "Public URL:" = "Публичный URL:";
 "Path Prefix:" = "Префикс пути:";

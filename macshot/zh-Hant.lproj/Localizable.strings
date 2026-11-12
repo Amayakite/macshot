@@ -355,6 +355,7 @@
 "Region:" = "區域：";
 "Bucket:" = "儲存貯體：";
 "Access Key:" = "存取金鑰：";
+"App ID:" = "應用 ID:";
 "Secret Key:" = "秘密金鑰：";
 "Public URL:" = "公開 URL：";
 "Path Prefix:" = "路徑前綴：";

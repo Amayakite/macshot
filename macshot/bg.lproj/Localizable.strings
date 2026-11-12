@@ -356,6 +356,7 @@
 "Region:" = "Регион:";
 "Bucket:" = "Контейнер:";
 "Access Key:" = "Ключ за достъп:";
+"App ID:" = "App ID:";
 "Secret Key:" = "Таен ключ:";
 "Public URL:" = "Публичен URL:";
 "Path Prefix:" = "Префикс на пътя:";

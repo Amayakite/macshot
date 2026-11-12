@@ -64,6 +64,10 @@ enum SettingsPortability {
         // Account PII / history that isn't credential-named but shouldn't leave the machine.
         "gdriveUserEmail",
         "imgbbUploads",   // uploaded image links + delete URLs
+        // Translation engine app ids. The matching secrets are already caught by the
+        // `secret` substring rule; exporting half a credential pair would only produce a
+        // settings file whose translation engine fails on the other machine.
+        "baiduTranslateAppID", "youdaoTranslateAppKey",
     ]
 
     /// Prefixes of OS/framework key families macOS injects into every app's domain. Stable —

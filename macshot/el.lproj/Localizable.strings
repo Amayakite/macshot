@@ -356,6 +356,7 @@
 "Region:" = "Περιοχή:";
 "Bucket:" = "Bucket:";
 "Access Key:" = "Κλειδί πρόσβασης:";
+"App ID:" = "App ID:";
 "Secret Key:" = "Μυστικό κλειδί:";
 "Public URL:" = "Δημόσιο URL:";
 "Path Prefix:" = "Πρόθεμα διαδρομής:";

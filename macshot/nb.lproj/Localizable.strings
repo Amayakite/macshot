@@ -354,6 +354,7 @@
 "Region:" = "Region:";
 "Bucket:" = "Beholder:";
 "Access Key:" = "Tilgangsn\U00F8kkel:";
+"App ID:" = "App ID:";
 "Secret Key:" = "Hemmelig n\U00F8kkel:";
 "Public URL:" = "Offentlig URL:";
 "Path Prefix:" = "Sti-prefiks:";

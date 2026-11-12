@@ -75,13 +75,15 @@ extension OverlayView {
 
     func showTranslatePopover(anchorRect: NSRect, anchorView: NSView? = nil) {
         if PopoverHelper.toggleClosedIfOpen() { return }
-        let languages = TranslationService.availableLanguages
+        // Only the languages the active engine can actually translate into: a
+        // picker entry that the engine rejects is worse than a shorter list.
+        let languages = TranslationService.supportedLanguages(for: TranslationService.provider)
         let currentCode = TranslationService.targetLanguage
 
         let showPopover: ([String: Bool]?) -> Void = { [weak self] appleAvailability in
             guard let self = self else { return }
             // When Apple Translation is active, only show installed languages
-            let filteredLanguages: [(code: String, name: String)]
+            let filteredLanguages: [TranslationLanguage]
             if let avail = appleAvailability {
                 filteredLanguages = languages.filter { avail[$0.code] == true }
             } else {
@@ -135,7 +137,7 @@ extension OverlayView {
 
         // If Apple Translation is selected, check which languages are installed
         if #available(macOS 15.0, *), TranslationService.provider == .apple {
-            TranslationService.checkAppleLanguageAvailability { availability in
+            TranslationService.installedAppleLanguages { availability in
                 showPopover(availability)
             }
         } else {

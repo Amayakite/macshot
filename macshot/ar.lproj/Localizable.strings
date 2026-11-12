@@ -349,6 +349,7 @@
 "Region:" = "المنطقة:";
 "Bucket:" = "الحاوية:";
 "Access Key:" = "مفتاح الوصول:";
+"App ID:" = "App ID:";
 "Secret Key:" = "المفتاح السري:";
 "Public URL:" = "الرابط العام:";
 "Path Prefix:" = "بادئة المسار:";

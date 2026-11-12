@@ -68,7 +68,17 @@ macshot/
 │   ├── BeautifyRenderer.swift          # Gradient frame / background beautification (linear + mesh gradients)
 │   ├── AutoRedactor.swift              # PII regex detection + Vision OCR → redaction annotations
 │   ├── TranslationOverlay.swift        # OCR → translate → overlay annotations
-│   ├── TranslationService.swift        # Google Translate API wrapper
+│   ├── TranslationService.swift        # Router: provider, target language, batch calls
+│   ├── Translation/                    # Engines behind TranslationService
+│   │   ├── TranslationEngine.swift     # Provider enum, engine protocol, registry, credentials, errors
+│   │   ├── TranslationLanguageCatalog.swift  # Canonical codes + per-vendor code mapping
+│   │   ├── TranslationBatching.swift   # Request grouping, answer reconciliation, paced dispatch
+│   │   ├── TranslationHTTP.swift       # Signed form POST + lenient JSON scalars
+│   │   ├── TranslationSigner.swift     # Baidu MD5 / Youdao SHA-256 request signing
+│   │   ├── AppleTranslationEngine.swift  # On-device Translation framework (macOS 15+)
+│   │   ├── GoogleTranslationEngine.swift # translate.googleapis.com endpoint
+│   │   ├── BaiduTranslationEngine.swift  # Signed API, ~1 QPS free tier
+│   │   └── YoudaoTranslationEngine.swift # Signed API v3
 │   ├── VisionOCR.swift                 # Vision text recognition request factory
 │   ├── HotkeyManager.swift            # Global keyboard shortcut (Carbon RegisterEventHotKey)
 │   ├── KeyboardShortcutMatcher.swift   # Layout-aware character matching for shortcuts
@@ -262,7 +272,7 @@ The video editor is built around `VideoEditorDocument` (one `VideoProject`: time
 - Recording: `recordingFormat` (mp4/gif), `recordingFPS`, `recordingOnStop`
 - History: `historySize`
 - Tools: `enabledTools`, `knownToolRawValues`
-- Features: `imgbbAPIKey`, `beautifyEnabled`, `beautifyStyleIndex`, `beautifyMode`, `beautifyPadding`, `beautifyCornerRadius`, `beautifyShadowRadius`, `pencilSmoothEnabled`, `loupeSize`, `stampSize`, `translateTargetLang`
+- Features: `imgbbAPIKey`, `beautifyEnabled`, `beautifyStyleIndex`, `beautifyMode`, `beautifyPadding`, `beautifyCornerRadius`, `beautifyShadowRadius`, `pencilSmoothEnabled`, `loupeSize`, `stampSize`, `translateTargetLang`, `translationProvider`, `baiduTranslateAppID`, `baiduTranslateSecretKey`, `youdaoTranslateAppKey`, `youdaoTranslateAppSecret`
 - Styles: `currentLineStyle`, `currentArrowStyle`, `currentRectFillStyle`, `currentRectCornerRadius`
 - Upload: `uploadProvider` (imgbb/gdrive), `googleDriveRefreshToken`, `gdriveFolderName` (Drive destination folder, defaults to "macshot"), `uploadConfirmEnabled`
 
@@ -343,6 +353,7 @@ Copy to clipboard, Save to file (PNG/JPEG/HEIC/WebP), Pin (floating always-on-to
 - **GIF export streams.** Use `GIFExporter` with the processed timeline and an explicit output cadence. `GIFEncoder` consumes presentation timestamps and writes one ImageIO-encoded frame at a time, combining unchanged pixels into holds. Do not accumulate an animation in one ImageIO destination, decimate by guessed source FPS, or spool every frame into scratch PNGs.
 - **Uploads stream, they don't buffer.** A recording is routinely larger than the memory the app can hold, so uploaders take an `UploadPayload` (`.file` for recordings, `.data` for encoded screenshots). `UploadPayload` chunks, hashes incrementally for SigV4, and `MultipartBodyWriter` writes request bodies straight to a temp file. Don't reintroduce `Data(contentsOf:)` on a recording.
 - **Upload bodies and callbacks belong to one job.** Prepare `PreparedUploadBody` off the main actor, hash the bytes while writing that owned body, and retain it through every retry. Never reread the public source for a retry or put progress on a shared uploader property. `UploadJob` participates in the existing quit drain; completion owns source leases until the request finishes. Drive retries reuse one pre-generated file ID and one multipart body. Account/cache changes stay on the main actor, and stale responses must not restore signed-out credentials or folders. Verify requests with local fixtures, not live cloud uploads.
+- **Translation engines are plugins behind one protocol.** `TranslationService` is only a router: it resolves the stored provider (falling back when an engine can't run on this macOS version), clamps the target language to what that engine offers, and guarantees a main-queue callback. Engines own everything vendor-specific — credentials, their own language codes, request budgets, rate limits. Adding an engine means a new `TranslationEngine` value, a registry entry and no UI change; never add a vendor branch to the UI. Route user-visible requests through `translateBatch` only. Credentials are stored in UserDefaults under `…Secret`/`…SecretKey`-style names so `SettingsPortability.looksSecret` keeps them out of exported settings files, and the matching app-id keys are listed in `excludedKeys` so half a credential pair never leaves the machine. Signed vendors answer per line only when the segment count matches what was sent: `TranslationBatchReconciler` returns nil otherwise and `TranslationBatchSender` re-asks line by line, because a shifted line is worse than a second request.
 - **Keyboard shortcuts:** Character-based commands must go through `KeyboardShortcutMatcher`; do not compare raw letter key codes or read `charactersIgnoringModifiers` directly. The matcher follows the character produced by rearranged Latin layouts such as QWERTZ, AZERTY, and Dvorak, while falling back through the user's ASCII-capable layout for non-Latin input sources such as Russian or Arabic. Use `EditorCommandShortcutManager` for configurable Undo/Redo chords and `ToolShortcutManager` plus `KeyboardShortcutMatcher.toolCharacters(for:)` for single-key overlay tools. Raw `event.keyCode` checks are appropriate only for layout-independent non-character keys such as Escape, Return, Tab, Space, Delete, arrows, and function keys. Global Carbon hotkeys remain physical key-code bindings; translate them only for display with `KeyboardShortcutMatcher.currentLayoutCharacter(for:)`, and disable `NSMenuItem` automatic key-equivalent localization after applying an already-translated physical binding.
 - `autoreleasepool` for overlay teardown to prevent memory spikes
 - Extension files (`OverlayView+Feature.swift`) for self-contained feature code that accesses OverlayView state but is logically separate (recording overlays, scroll capture HUD, window snapping, popovers)

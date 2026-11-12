@@ -355,6 +355,7 @@
 "Region:" = "Vùng:";
 "Bucket:" = "Bucket:";
 "Access Key:" = "Khóa truy cập:";
+"App ID:" = "App ID:";
 "Secret Key:" = "Khóa bí mật:";
 "Public URL:" = "URL công khai:";
 "Path Prefix:" = "Tiền tố đường dẫn:";

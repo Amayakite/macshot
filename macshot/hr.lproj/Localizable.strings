@@ -356,6 +356,7 @@
 "Region:" = "Regija:";
 "Bucket:" = "Spremnik:";
 "Access Key:" = "Pristupni ključ:";
+"App ID:" = "App ID:";
 "Secret Key:" = "Tajni ključ:";
 "Public URL:" = "Javni URL:";
 "Path Prefix:" = "Prefiks putanje:";

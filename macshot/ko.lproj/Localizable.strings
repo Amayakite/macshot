@@ -338,6 +338,7 @@
 "Region:" = "리전:";
 "Bucket:" = "버킷:";
 "Access Key:" = "액세스 키:";
+"App ID:" = "앱 ID:";
 "Secret Key:" = "시크릿 키:";
 "Public URL:" = "공개 URL:";
 "Path Prefix:" = "경로 접두사:";

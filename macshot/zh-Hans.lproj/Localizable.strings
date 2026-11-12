@@ -338,6 +338,7 @@
 "Region:" = "区域:";
 "Bucket:" = "存储桶:";
 "Access Key:" = "访问密钥:";
+"App ID:" = "应用 ID:";
 "Secret Key:" = "私有密钥:";
 "Public URL:" = "公共 URL:";
 "Path Prefix:" = "路径前缀:";

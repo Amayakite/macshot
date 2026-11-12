@@ -113,6 +113,13 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSWindowD
     private var downscaleRetinaCheckbox: NSButton!
     private var captureMenuOrder: [CaptureMenuItemID] = []
     private var captureMenuOrderRowsStack: NSStackView?
+    // Translation engine controls. Credentials belong to an engine, so the rows
+    // below the picker are rebuilt whenever the engine changes.
+    private var translationEnginePopup: NSPopUpButton!
+    private var translationEngineDetailsStack: NSStackView!
+    private var translationTestButton: NSButton?
+    private var translationTestStatusLabel: NSTextField?
+    private var translationCredentialFields: [String: NSTextField] = [:]
     // embedColorProfileCheckbox removed — native color profile is always embedded
     private var localMonitor: Any?
     #if !OFFLINE
@@ -1052,35 +1059,33 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSWindowD
         stack.setCustomSpacing(20, after: stack.arrangedSubviews.last!)
 
         // ── Translation ──────────────────────────────────────
-        if TranslationService.appleTranslationAvailable {
-            stack.addArrangedSubview(sectionHeader(L("Translation")))
-            stack.setCustomSpacing(10, after: stack.arrangedSubviews.last!)
+        // Always shown: the engine list is built from the registry, so a custom
+        // engine is selectable on any macOS version, not just macOS 15+ where
+        // Apple's on-device engine happens to exist.
+        stack.addArrangedSubview(sectionHeader(L("Translation")))
+        stack.setCustomSpacing(10, after: stack.arrangedSubviews.last!)
 
-            let translationProviderPopup = NSPopUpButton()
-            translationProviderPopup.addItems(withTitles: [
-                L("Apple (on-device)"),
-                L("Google Translate"),
-            ])
-            translationProviderPopup.selectItem(at: TranslationService.provider == .apple ? 0 : 1)
-            translationProviderPopup.target = self
-            translationProviderPopup.action = #selector(translationProviderChanged(_:))
-            stack.addArrangedSubview(labeledRow(L("Engine:"), controls: [translationProviderPopup]))
-            stack.setCustomSpacing(4, after: stack.arrangedSubviews.last!)
-
-            let providerNote = NSTextField(wrappingLabelWithString: L("Apple translation is faster and works offline. Google Translate supports more languages."))
-            providerNote.font = NSFont.systemFont(ofSize: 10)
-            providerNote.textColor = .secondaryLabelColor
-            stack.addArrangedSubview(indented(providerNote))
-            stack.setCustomSpacing(4, after: stack.arrangedSubviews.last!)
-
-            let downloadLink = NSButton(title: L("Download language packs in System Settings…"), target: self, action: #selector(openTranslationSettings))
-            downloadLink.bezelStyle = .inline
-            downloadLink.isBordered = false
-            downloadLink.contentTintColor = .linkColor
-            downloadLink.font = NSFont.systemFont(ofSize: 10)
-            stack.addArrangedSubview(indented(downloadLink))
-            stack.setCustomSpacing(20, after: stack.arrangedSubviews.last!)
+        translationEnginePopup = NSPopUpButton()
+        for engine in TranslationEngineRegistry.engines {
+            translationEnginePopup.addItem(withTitle: engine.displayName)
+            translationEnginePopup.lastItem?.representedObject = engine.provider.rawValue
         }
+        selectTranslationEngineRow(TranslationService.provider)
+        translationEnginePopup.target = self
+        translationEnginePopup.action = #selector(translationEngineChanged(_:))
+        stack.addArrangedSubview(labeledRow(L("Engine:"), controls: [translationEnginePopup]))
+        stack.setCustomSpacing(4, after: stack.arrangedSubviews.last!)
+
+        // Credentials, engine notes and the connection test all depend on the
+        // selected engine, so they live in a sub-stack that is rebuilt on change.
+        translationEngineDetailsStack = NSStackView()
+        translationEngineDetailsStack.orientation = .vertical
+        translationEngineDetailsStack.alignment = .leading
+        translationEngineDetailsStack.spacing = 6
+        translationEngineDetailsStack.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(translationEngineDetailsStack)
+        stack.setCustomSpacing(20, after: stack.arrangedSubviews.last!)
+        rebuildTranslationEngineDetails()
 
         // ── Menu Bar Order ──────────────────────────────────
         stack.addArrangedSubview(sectionHeader(L("Menu Bar Order")))
@@ -2750,6 +2755,11 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSWindowD
         imgbbKeyField.stringValue = UserDefaults.standard.string(forKey: "imgbbAPIKey") ?? ""
         #endif
 
+        // Translation engine + its credentials (an imported settings file can
+        // change both while the window stays open).
+        selectTranslationEngineRow(TranslationService.provider)
+        rebuildTranslationEngineDetails()
+
         // Recording
         let recFPS = UserDefaults.standard.integer(forKey: "recordingFPS")
         let mp4Options = [15, 24, 30, 60, 120]
@@ -3416,8 +3426,129 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSWindowD
         UserDefaults.standard.set(sender.state == .on, forKey: "betaUpdatesEnabled")
     }
 
-    @objc private func translationProviderChanged(_ sender: NSPopUpButton) {
-        TranslationService.provider = sender.indexOfSelectedItem == 0 ? .apple : .google
+    // MARK: - Translation engine
+
+    /// Selects the picker row for `provider`, falling back to the first row when
+    /// the stored engine is not offered on this system.
+    private func selectTranslationEngineRow(_ provider: TranslationProvider) {
+        for (index, item) in translationEnginePopup.itemArray.enumerated()
+        where item.representedObject as? String == provider.rawValue {
+            translationEnginePopup.selectItem(at: index)
+            return
+        }
+        translationEnginePopup.selectItem(at: 0)
+    }
+
+    /// Rebuilds the engine-dependent rows: credential fields, engine notes and
+    /// the connection test. Cheap enough to run on every engine change and on
+    /// settings import.
+    private func rebuildTranslationEngineDetails() {
+        guard let details = translationEngineDetailsStack else { return }
+        for view in details.arrangedSubviews {
+            details.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+        translationCredentialFields.removeAll()
+        translationTestButton = nil
+        translationTestStatusLabel = nil
+
+        guard let engine = TranslationEngineRegistry.engine(for: TranslationService.provider) else { return }
+
+        for credential in engine.credentials {
+            let field: NSTextField = credential.isSecure ? NSSecureTextField() : NSTextField()
+            field.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+            field.placeholderString = credential.placeholder
+            field.stringValue = TranslationCredentials.value(for: credential.defaultsKey)
+            field.target = self
+            field.action = #selector(translationCredentialChanged(_:))
+            translationCredentialFields[credential.defaultsKey] = field
+            details.addArrangedSubview(labeledRow(L(credential.labelKey), controls: [field]))
+        }
+
+        if engine.provider == .apple {
+            let note = NSTextField(wrappingLabelWithString: L("Apple translation is faster and works offline. Google Translate supports more languages."))
+            note.font = NSFont.systemFont(ofSize: 10)
+            note.textColor = .secondaryLabelColor
+            details.addArrangedSubview(indented(note))
+
+            let downloadLink = NSButton(title: L("Download language packs in System Settings…"), target: self, action: #selector(openTranslationSettings))
+            downloadLink.bezelStyle = .inline
+            downloadLink.isBordered = false
+            downloadLink.contentTintColor = .linkColor
+            downloadLink.font = NSFont.systemFont(ofSize: 10)
+            details.addArrangedSubview(indented(downloadLink))
+            return
+        }
+
+        let testButton = NSButton(title: L("Test Connection"), target: self, action: #selector(translationTestTapped(_:)))
+        testButton.bezelStyle = .rounded
+        testButton.isEnabled = engine.isConfigured
+
+        let status = NSTextField(labelWithString: "")
+        status.font = NSFont.systemFont(ofSize: 11)
+        status.textColor = .secondaryLabelColor
+        status.lineBreakMode = .byTruncatingTail
+
+        let testRow = NSStackView(views: [testButton, status])
+        testRow.orientation = .horizontal
+        testRow.spacing = 8
+        details.addArrangedSubview(indented(testRow))
+
+        translationTestButton = testButton
+        translationTestStatusLabel = status
+    }
+
+    /// Writes every credential field back to defaults. Saving all of them keeps
+    /// the closure-free `target/action` path simple and can't miss a row that was
+    /// edited without losing focus.
+    private func saveTranslationCredentials() {
+        for (key, field) in translationCredentialFields {
+            TranslationCredentials.set(field.stringValue, for: key)
+        }
+    }
+
+    @objc private func translationEngineChanged(_ sender: NSPopUpButton) {
+        guard let raw = sender.selectedItem?.representedObject as? String,
+              let provider = TranslationProvider(rawValue: raw) else { return }
+        saveTranslationCredentials()
+        TranslationService.provider = provider
+        rebuildTranslationEngineDetails()
+    }
+
+    @objc private func translationCredentialChanged(_ sender: NSTextField) {
+        saveTranslationCredentials()
+        if let engine = TranslationEngineRegistry.engine(for: TranslationService.provider) {
+            translationTestButton?.isEnabled = engine.isConfigured
+        }
+    }
+
+    @objc private func translationTestTapped(_ sender: NSButton) {
+        saveTranslationCredentials()
+        guard let engine = TranslationEngineRegistry.engine(for: TranslationService.provider) else { return }
+
+        sender.isEnabled = false
+        translationTestStatusLabel?.stringValue = L("Testing...")
+        translationTestStatusLabel?.textColor = .secondaryLabelColor
+
+        // Translate into the current target when it is supported, so the test
+        // exercises the same language pair the user will actually use.
+        let target = TranslationLanguageCatalog.resolvedCode(
+            TranslationService.targetLanguage, in: engine.languages)
+
+        engine.translate(texts: ["Hello"], to: target) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.translationTestButton?.isEnabled = true
+                switch result {
+                case .success:
+                    self.translationTestStatusLabel?.stringValue = L("Connection successful!")
+                    self.translationTestStatusLabel?.textColor = .systemGreen
+                case .failure(let error):
+                    self.translationTestStatusLabel?.stringValue = error.localizedDescription
+                    self.translationTestStatusLabel?.textColor = .systemRed
+                }
+            }
+        }
     }
 
     @objc private func openTranslationSettings() {

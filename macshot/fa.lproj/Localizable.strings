@@ -349,6 +349,7 @@
 "Region:" = "منطقه:";
 "Bucket:" = "باکت:";
 "Access Key:" = "کلید دسترسی:";
+"App ID:" = "App ID:";
 "Secret Key:" = "کلید محرمانه:";
 "Public URL:" = "آدرس عمومی:";
 "Path Prefix:" = "پیشوند مسیر:";

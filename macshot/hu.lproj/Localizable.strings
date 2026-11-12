@@ -355,6 +355,7 @@
 "Region:" = "Régió:";
 "Bucket:" = "Tároló:";
 "Access Key:" = "Hozzáférési kulcs:";
+"App ID:" = "App ID:";
 "Secret Key:" = "Titkos kulcs:";
 "Public URL:" = "Nyilvános URL:";
 "Path Prefix:" = "Útvonal előtag:";

@@ -339,6 +339,7 @@
 "Region:" = "Regione:";
 "Bucket:" = "Bucket:";
 "Access Key:" = "Chiave di accesso:";
+"App ID:" = "App ID:";
 "Secret Key:" = "Chiave segreta:";
 "Public URL:" = "URL pubblico:";
 "Path Prefix:" = "Prefisso percorso:";

@@ -353,6 +353,7 @@
 "Region:" = "অঞ্চল:";
 "Bucket:" = "বাকেট:";
 "Access Key:" = "অ্যাক্সেস কী:";
+"App ID:" = "App ID:";
 "Secret Key:" = "সিক্রেট কী:";
 "Public URL:" = "পাবলিক URL:";
 "Path Prefix:" = "পাথ প্রিফিক্স:";

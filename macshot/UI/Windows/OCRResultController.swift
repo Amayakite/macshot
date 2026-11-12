@@ -116,14 +116,19 @@ class OCRResultController: NSObject {
         headerRow.addArrangedSubview(langLabel)
 
         let popup = NSPopUpButton(frame: .zero, pullsDown: false)
-        for lang in TranslationService.availableLanguages {
+        // Offer only what the active translation engine can translate into, so a
+        // selection never fails with "unsupported language".
+        let languages = TranslationService.supportedLanguages(for: TranslationService.provider)
+        for lang in languages {
             popup.addItem(withTitle: lang.name)
             popup.lastItem?.representedObject = lang.code
         }
         // Select saved language
         let savedCode = TranslationService.targetLanguage
-        if let idx = TranslationService.availableLanguages.firstIndex(where: { $0.code == savedCode }) {
+        if let idx = languages.firstIndex(where: { $0.code == savedCode }) {
             popup.selectItem(at: idx)
+        } else {
+            popup.selectItem(at: 0)
         }
         popup.target = self
         popup.action = #selector(languageChanged(_:))

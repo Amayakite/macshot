@@ -354,6 +354,7 @@
 "Region:" = "Alue:";
 "Bucket:" = "Säiliö:";
 "Access Key:" = "Käyttöavain:";
+"App ID:" = "App ID:";
 "Secret Key:" = "Salainen avain:";
 "Public URL:" = "Julkinen URL:";
 "Path Prefix:" = "Polun etuliite:";

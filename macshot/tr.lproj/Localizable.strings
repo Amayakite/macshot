@@ -349,6 +349,7 @@
 "Region:" = "Bölge:";
 "Bucket:" = "Kova:";
 "Access Key:" = "Erişim Anahtarı:";
+"App ID:" = "App ID:";
 "Secret Key:" = "Gizli Anahtar:";
 "Public URL:" = "Genel URL:";
 "Path Prefix:" = "Yol Ön Eki:";

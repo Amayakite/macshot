@@ -338,6 +338,7 @@
 "Region:" = "リージョン:";
 "Bucket:" = "バケット:";
 "Access Key:" = "アクセスキー:";
+"App ID:" = "アプリ ID:";
 "Secret Key:" = "シークレットキー:";
 "Public URL:" = "パブリック URL:";
 "Path Prefix:" = "パスプレフィックス:";
